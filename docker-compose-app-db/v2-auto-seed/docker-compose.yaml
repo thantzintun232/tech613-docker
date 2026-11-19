@@ -1,0 +1,34 @@
+services:
+  mongo:
+    image: mongo:7.0
+    container_name: ttt-mongo
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo-data:/data/db
+
+  app:
+    image: thantzintun234/tech613-tttapp:1.2.0
+    container_name: ttt-app
+    ports:
+      - "3000:3000"
+    environment:
+      - MONGODB_URI=mongodb://mongo:27017/tictactoe
+      - STATEFUL_MODE=server
+    depends_on:
+      - mongo
+
+  seed:
+    image: thantzintun234/tech613-tttapp:1.2.0
+    container_name: ttt-seed
+    command: sh -c "sleep 5 && node seeds/seed.js"
+    environment:
+      - MONGODB_URI=mongodb://mongo:27017/tictactoe
+      - SEED_BASE_URL=http://app:3000
+    depends_on:
+      - app
+      - mongo
+    restart: "no"
+
+volumes:
+  mongo-data:
