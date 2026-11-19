@@ -1,0 +1,22 @@
+services:
+  mongo:
+    image: mongo:7.0
+    container_name: ttt-mongo
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo-data:/data/db
+
+  app:
+    image: thantzintun234/tech613-tttapp:1.2.0
+    container_name: ttt-app
+    command: sh -c "node index.js & sleep 5 && node seeds/seed.js; wait"
+    ports:
+      - "3000:3000"
+    environment:
+      - MONGODB_URI=mongodb://mongo:27017/tictactoe
+    depends_on:
+      - mongo
+
+volumes:
+  mongo-data:
