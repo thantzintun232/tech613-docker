@@ -1,18 +1,10 @@
 # Deploying the Tic Tac Toe App on Kubernetes
 
-I deployed my Node.js Tic Tac Toe (TTT) app on a local Kubernetes cluster in two stages:
+I deployed the Node.js Tic Tac Toe (TTT) app on a local Kubernetes cluster in three stages:
 
-1. **App only:** 3 replicas, exposed with a NodePort service
-2. **App + database:** the same app, plus a Mongo database (1 replica)
-
-My notes from the code-along are in [k8s-code-along.md](k8s-code-along.md).
-
----
-
-## Prerequisites
-
-- App image on Docker Hub: `thantzintun234/tech613-tttapp:1.2.0`
-- Database image: `mongo:7.0` (the official Mongo image)
+1. **Part 1 - App only:** 3 replicas, exposed with a NodePort service
+2. **Part 2 - App + database:** the same app, plus a Mongo database (1 replica)
+3. **Part 3 - App + database + storage:** Mongo keeps its data using a PV and PVC
 
 ---
 
