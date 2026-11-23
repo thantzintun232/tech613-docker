@@ -1,0 +1,26 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ttt-app-deployment
+spec:
+  selector:
+    matchLabels:
+      app: ttt-app
+  template:
+    metadata:
+      labels:
+        app: ttt-app
+    spec:
+      containers:
+        - name: ttt-app
+          image: thantzintun234/tech613-tttapp:1.2.0
+          ports:
+            - containerPort: 3000
+          env:
+            - name: MONGODB_URI
+              value: mongodb://mongo-service:27017/tictactoe
+          resources:
+            requests:
+              cpu: 100m
+            limits:
+              cpu: 200m
