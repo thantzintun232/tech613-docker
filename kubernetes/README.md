@@ -17,11 +17,15 @@ My notes from the code-along are in [k8s-code-along.md](k8s-code-along.md).
 ---
 
 ## Architecture
-![alt text](<yaml-definitions/autodraw 11_20_2026.png>)
+![alt text](img/k8-architecture-completed.svg)
 
-- The Deployment keeps 3 identical app pods running (via a ReplicaSet).
-- The app service lets me open the app from my browser.
-- In part 2, the app pods talk to Mongo through an internal (ClusterIP) service. Nothing outside the cluster can reach the database.
+- The Browser reaches the app through the App Service (NodePort), at `localhost:30001`.
+- The App Service sends traffic to the 3 app pods.
+- The Deployment keeps 3 identical app pods running, using a ReplicaSet
+- The app pods talk to Mongo through the Mongo Service (ClusterIP). It is internal only, so nothing outside the cluster can reach the database.
+- The Mongo Deployment runs 1 Mongo pod.
+- The Mongo pod uses a PVC (a request for storage), which is bound to a PV (the real storage).
+- The data stays in the PV, so it survives if the Mongo pod is deleted and re-created.
 
 ---
 
@@ -158,3 +162,137 @@ kubectl get all
 - Containers in the cluster reach each other by **service name**, not by IP.
 - Use **NodePort** to expose the app, and **ClusterIP** to keep the database private.
 - Mongo has no volume here, so its data is lost if the pod is replaced. A persistent volume would fix that.
+
+---
+
+## Part 3: Persistent storage for Mongo (PV and PVC)
+
+Folder: `yaml-definitions/local-ttt-app-db-deploy`
+
+In part 2, the database data was lost if the Mongo pod was deleted, because pod storage is temporary. To fix that, I added a **PV** and a **PVC**.
+
+### What are PV and PVC?
+
+| | Meaning | Simple idea |
+|---|---|---|
+| **PV** (PersistentVolume) | A piece of storage in the cluster | The storage unit |
+| **PVC** (PersistentVolumeClaim) | A pod's request for storage | The rental request |
+
+```
+Mongo pod → PVC (request) → PV (real storage)
+```
+
+If the Mongo pod is deleted, the PV keeps the data. The new pod claims the same storage and finds its old data.
+
+I kept the size small (`100Mi`, about 105 MB) because the scoreboard data is tiny and the task said not to over-allocate.
+
+### `mongo-pv.yml`
+
+```yaml
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: mongo-pv
+spec:
+  capacity:
+    storage: 100Mi
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: manual
+  hostPath:
+    path: /data/mongo
+```
+
+### `mongo-pvc.yml`
+
+```yaml
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: mongo-pvc
+spec:
+  storageClassName: manual
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 100Mi
+```
+
+### Change in `mongo-deploy.yml`
+
+The pod uses the PVC and mounts it at `/data/db`, the folder where Mongo saves its data:
+
+```yaml
+    spec:
+      containers:
+        - name: mongo
+          image: mongo:7.0
+          ports:
+            - containerPort: 27017
+          volumeMounts:
+            - name: mongo-storage
+              mountPath: /data/db
+      volumes:
+        - name: mongo-storage
+          persistentVolumeClaim:
+            claimName: mongo-pvc
+```
+
+### How the files link
+
+| Link | What must match |
+|---|---|
+| PVC → PV | Same `storageClassName` and `accessModes`. The PV must be at least as big as the PVC's request. |
+| Pod → PVC | `claimName` in the deployment matches the PVC's `name` (`mongo-pvc`) |
+| Mount → volume | `volumeMounts.name` matches `volumes.name` (`mongo-storage`) |
+
+### Deploy
+
+The PV and PVC go first, so the storage is ready before the database starts:
+
+```bash
+kubectl apply -f mongo-pv.yml
+kubectl apply -f mongo-pvc.yml
+kubectl apply -f mongo-deploy.yml
+kubectl apply -f mongo-service.yml
+kubectl apply -f ttt-deploy.yml
+kubectl apply -f ttt-service.yml
+```
+
+### Check the storage
+
+```bash
+kubectl get pv
+kubectl get pvc
+```
+
+The PVC status should say `Bound`, which means it has been matched to the PV.
+
+
+### Test that the data stays
+
+1. Open the app at `http://localhost:30001` and note the scoreboard data
+2. Delete the Mongo deployment: `kubectl delete -f mongo-deploy.yml`
+3. Re-create it: `kubectl apply -f mongo-deploy.yml`
+4. Refresh the app and check the scoreboard shows the same data
+
+### Clean up
+
+PVs stay in the cluster until they are removed, so I deleted them at the end. PVC first, then PV:
+
+```bash
+kubectl delete -f ttt-service.yml
+kubectl delete -f ttt-deploy.yml
+kubectl delete -f mongo-service.yml
+kubectl delete -f mongo-deploy.yml
+kubectl delete -f mongo-pvc.yml
+kubectl delete -f mongo-pv.yml
+kubectl get pv
+```
+
+### Notes
+
+- I used separate files so that deleting `mongo-deploy.yml` doesn't delete the storage.
+
+
