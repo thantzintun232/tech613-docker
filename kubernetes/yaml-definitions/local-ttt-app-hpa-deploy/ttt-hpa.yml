@@ -6,7 +6,7 @@ spec:
   scaleTargetRef:
     apiVersion: apps/v1
     kind: Deployment
-    name: ttt-app-deployment   # must match the deployment's name
+    name: ttt-app-deployment   
   minReplicas: 2
   maxReplicas: 10
   metrics:
